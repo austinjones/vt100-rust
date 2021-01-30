@@ -1,5 +1,5 @@
 use crate::term::{
-    BufWrite as _, DisableAlternateScreen, EnableAlternateScreen,
+    BufWrite as _, DisableAlternateScreen, EnableAlternateScreen, MoveTo,
 };
 use enumset::{EnumSet, EnumSetType};
 use std::convert::TryInto as _;
@@ -256,7 +256,9 @@ impl Screen {
         let mut contents = vec![];
         if self.modes.contains(Mode::AlternateScreen) {
             self.write_contents_formatted(&self.grid, &mut contents);
+
             EnableAlternateScreen::default().write_buf(&mut contents);
+            MoveTo::default().write_buf(&mut contents);
             self.write_contents_formatted(
                 &self.alternate_grid,
                 &mut contents,
@@ -269,6 +271,7 @@ impl Screen {
             );
 
             DisableAlternateScreen::default().write_buf(&mut contents);
+            MoveTo::default().write_buf(&mut contents);
             self.write_contents_formatted(&self.grid, &mut contents);
         }
         contents
