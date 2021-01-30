@@ -1,5 +1,8 @@
-use crate::term::{
-    BufWrite as _, DisableAlternateScreen, EnableAlternateScreen, MoveTo,
+use crate::{
+    grid::RowFilter,
+    term::{
+        BufWrite as _, DisableAlternateScreen, EnableAlternateScreen, MoveTo,
+    },
 };
 use enumset::{EnumSet, EnumSetType};
 use std::convert::TryInto as _;
@@ -242,11 +245,15 @@ impl Screen {
     #[must_use]
     pub fn contents_formatted(&self) -> Vec<u8> {
         let mut contents = vec![];
-        self.write_contents_formatted(self.grid(), &mut contents);
+        self.write_contents_formatted(
+            self.grid(),
+            RowFilter::Visible,
+            &mut contents,
+        );
         contents
     }
 
-    /// Returns the formatted visible contents of the terminal, including both buffers (alternate and primary)
+    /// Returns all output stored in the terminal, including both buffers (alternate and primary), and all scrollback
     ///
     /// Formatting information will be included inline as terminal escape
     /// codes. The result will be suitable for feeding directly to a raw
@@ -255,24 +262,34 @@ impl Screen {
     pub fn all_contents_formatted(&self) -> Vec<u8> {
         let mut contents = vec![];
         if self.modes.contains(Mode::AlternateScreen) {
-            self.write_contents_formatted(&self.grid, &mut contents);
+            self.write_contents_formatted(
+                &self.grid,
+                RowFilter::All,
+                &mut contents,
+            );
 
             EnableAlternateScreen::default().write_buf(&mut contents);
             MoveTo::default().write_buf(&mut contents);
             self.write_contents_formatted(
                 &self.alternate_grid,
+                RowFilter::All,
                 &mut contents,
             );
         } else {
             EnableAlternateScreen::default().write_buf(&mut contents);
             self.write_contents_formatted(
                 &self.alternate_grid,
+                RowFilter::All,
                 &mut contents,
             );
 
             DisableAlternateScreen::default().write_buf(&mut contents);
             MoveTo::default().write_buf(&mut contents);
-            self.write_contents_formatted(&self.grid, &mut contents);
+            self.write_contents_formatted(
+                &self.grid,
+                RowFilter::All,
+                &mut contents,
+            );
         }
         contents
     }
@@ -280,10 +297,11 @@ impl Screen {
     fn write_contents_formatted(
         &self,
         grid: &crate::grid::Grid,
+        rows: RowFilter,
         contents: &mut Vec<u8>,
     ) {
         crate::term::HideCursor::new(self.hide_cursor()).write_buf(contents);
-        let prev_attrs = self.grid().write_contents_formatted(contents);
+        let prev_attrs = grid.write_contents_formatted(rows, contents);
         self.attrs.write_escape_code_diff(contents, &prev_attrs);
     }
 
